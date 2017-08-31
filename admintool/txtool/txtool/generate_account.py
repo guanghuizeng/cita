@@ -13,7 +13,8 @@ import sha3
 # 检查是否安装了openssl
 openssl_installed = which("openssl")
 if not openssl_installed:
-    sys.exit("Openssl not installed.Check txtool/README.md and prerequest_sudo.sh for more infomation.")
+    sys.exit(
+        "Openssl not installed.Check txtool/README.md and prerequest_sudo.sh for more infomation.")
 
 accounts_path = Path("../output/accounts")
 if not accounts_path.is_dir():
@@ -36,6 +37,7 @@ def save_pubkey(pubkey):
     pubkey_file = open("../output/accounts/pubkey", "w+")
     pubkey_file.write(pubkey)
     pubkey_file.close()
+
 
 def save_address(address):
     address_file = open("../output/accounts/address", "w+")
