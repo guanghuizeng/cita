@@ -15,93 +15,92 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 extern crate kafka;
-extern crate env_logger;
 
 use std::time::Duration;
 
 use kafka::producer::{Producer,Record,RequiredAcks};
 use kafka::consumer::{Consumer,FetchOffset,GroupOffsetStorage};
-use kafka::error::Error as kafkaError;
+use kafka::error::Error as KafkaError;
 
 use::std::sync::mpsc::Receiver;
 use::std::sync::mpsc::Sender;
 use std::thread;
 
-pub fn start_kafkamq(name:&str,keys:Vec<String>,tx:Sender<(String,Vec<u8>)>,rx:Receiver<(String,Vec<u8>)>){
-    println!("into start_kafkamq");
-    env_logger::init().unwrap();
-    let mut brokers:Vec<String> = Vec::new();
-    brokers.push("localhost:9092".to_string());
-    let group = "my-group".to_owned(); 
-//producer thread
-    let brokers1 = brokers.clone();
+pub fn start_kafka(name: &str, keys: Vec<&str>, tx: Sender<(String,Vec<u8>)>, rx: Receiver<(String,Vec<u8>)>){
+    println!("into start_kafka");
     let  _=thread::Builder::new().name("publisher".to_string()).spawn(move || {
         println!("producer thread running!");
-        let mut tmp = 0;
-       loop{
-           tmp=tmp+1;
-           println!("tmp:{}",tmp);
+        let broker = "localhost:9092";
+        loop {
             let mut ret = rx.recv();
             if ret.is_err(){
-                println!("break!!!!!");
                 break;
             }
-            let(topic,msg)=ret.unwrap(); 
-            println!("{},{:?}",topic,msg);
-        if let Err(e) = produce_message(&msg, &topic, brokers1.clone()) {
-            println!("Failed producing messages: {}", e);
+            let (topic, msg) = ret.unwrap();
+            if let Err(e) = produce_message(&msg, &topic, vec![broker.to_string()]) {
+                println!("Failed producing messages: {}", e);
+            }
         }
-                
-        }
-        
     });
-//comsumer thread
-    let brokers2 = brokers.clone();
-    let _=thread::Builder::new().name("subscriber".to_string()).spawn(move ||{
+    let mut topics = Vec::new();
+    for key in keys {
+        topics.push(key.to_string());
+    }
+    let tx = tx.clone();
+    //comsumer thread
+    let _ = thread::Builder::new().name("consumer".to_string()).spawn(move ||{
         println!("consumer thread running!");
-     for topic in keys
-     {
-        let mut con =    Consumer::from_hosts(brokers2.clone())
-                        .with_topic(topic.to_string())
-                        //.with_group(group)
-                        .with_fallback_offset(FetchOffset::Earliest)
-                        .with_offset_storage(GroupOffsetStorage::Kafka)
-                        .create().unwrap();
-
-        
+        let mut con = Consumer::from_hosts(vec!["localhost:9092".to_owned()])
+                        .with_fallback_offset(FetchOffset::Earliest);
+                        
+        for topic in topics {
+            con = con.with_topic(topic);
+        }
+        let mut con = con.create().unwrap();
         loop{
             let mss = con.poll().unwrap();
             if mss.is_empty(){
                 println!("No Messages available right now.");
             }
+            println!("poll Messages.");
             for ms in mss.iter(){
                 for m in ms.messages(){
-                    println!("{:?}",m.value);
-                    let _=tx.send((topic.to_string(),m.value.to_vec()));
-                } 
-                let _=con.consume_messageset(ms);
+                    println!("get msg {:?} {:?}",ms.topic(), m.value);
+                    tx.send((ms.topic().to_string(), m.value.to_vec())).unwrap();
+                }
+                let _ = con.consume_messageset(ms);
             
             }
             con.commit_consumed().unwrap();
         }
-        
-    }
     });
 }
 
-fn produce_message<'a,'b>(data:&'a[u8],topic:&'b str,brokers:Vec<String>)->Result<(),kafkaError>{
-    println!("About to publish a message at {:?} to: {}", brokers, topic);
+fn produce_message<'a, 'b>(data: &'a [u8],
+                           topic: &'b str,
+                           brokers: Vec<String>)
+                           -> Result<(), KafkaError> {
+    println!("About to publish a message at {:?} to: {} data {:?}", brokers, topic, data);
 
-    let mut producer = try!(Producer::from_hosts(brokers.to_owned())
-                            .with_ack_timeout(Duration::from_secs(1))
-                            .with_required_acks(RequiredAcks::One)
-                            .create());
-    try!(producer.send(&Record {
-                           topic: topic,
-                           partition: -1,
-                           key: (),
-                           value: data,
-                       }));
+    // ~ create a producer. this is a relatively costly operation, so
+    // you'll do this typically once in your application and re-use
+    // the instance many times.
+    let mut producer = try!(Producer::from_hosts(brokers)
+             // ~ build the producer with the above settings
+             .create());
+
+    // ~ now send a single message.  this is a synchronous/blocking
+    // operation.
+
+    // ~ we're sending 'data' as a 'value'. there will be no key
+    // associated with the sent message.
+
+    // ~ we leave the partition "unspecified" - this is a negative
+    // partition - which causes the producer to find out one on its
+    // own using its underlying partitioner.
+
+    // ~ we can achieve exactly the same as above in a shorter way with
+    // the following call
     try!(producer.send(&Record::from_value(topic, data)));
 
     Ok(())

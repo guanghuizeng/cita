@@ -19,7 +19,9 @@
 extern crate pubsub_rabbitmq;
 #[cfg(feature = "pubsub_zeromq")]
 extern crate pubsub_zeromq;
-extern crate dotenv
+#[cfg(feature = "pubsub_kafka")]
+extern crate pubsub_kafka;
+extern crate dotenv;
 
 use std::sync::mpsc::Sender;
 use std::sync::mpsc::Receiver;
@@ -29,7 +31,10 @@ use dotenv::dotenv;
 use pubsub_rabbitmq::start_rabbitmq;
 
 #[cfg(feature = "pubsub_zeromq")]
-use pubsub_rabbitmq::start_rabbitmq;
+use pubsub_zeromq::start_zeromq;
+
+#[cfg(feature = "pubsub_kafka")]
+use pubsub_kafka::start_kafka;
 
 
 #[cfg(feature = "pubsub_rabbitmq")]
@@ -42,6 +47,12 @@ pub fn start_pubsub(name: &str, keys: Vec<&str>, tx: Sender<(String, Vec<u8>)>, 
 pub fn start_pubsub(name: &str, keys: Vec<&str>, tx: Sender<(String, Vec<u8>)>, rx: Receiver<(String, Vec<u8>)>) {
     dotenv().ok();
     start_zeromq(name, keys, tx, rx);
+}
+
+#[cfg(feature = "pubsub_kafka")]
+pub fn start_pubsub(name: &str, keys: Vec<&str>, tx: Sender<(String, Vec<u8>)>, rx: Receiver<(String, Vec<u8>)>) {
+    dotenv().ok();
+    start_kafka(name, keys, tx, rx);
 }
 
 #[cfg(test)]
@@ -58,11 +69,11 @@ mod test {
         let (ctx_pub, crx_pub) = channel();
         start_pubsub("chain", vec!["network.newtx", "network.newblk"], ctx_sub, crx_pub);
 
-        ntx_pub.send(("network.newtx".to_string(), vec![1])).unwrap();
-        ntx_pub.send(("network.newblk".to_string(), vec![2])).unwrap();
+        //ntx_pub.send(("network.newtx".to_string(), vec![1])).unwrap();
+        //ntx_pub.send(("network.newblk".to_string(), vec![2])).unwrap();
 
-        ctx_pub.send(("chain.newtx".to_string(), vec![3])).unwrap();
-        ctx_pub.send(("chain.newblk".to_string(), vec![4])).unwrap();
+        //ctx_pub.send(("chain.newtx".to_string(), vec![3])).unwrap();
+        //ctx_pub.send(("chain.newblk".to_string(), vec![4])).unwrap();
 
         assert_eq!(crx_sub.recv().unwrap(), ("network.newtx".to_string(), vec![1]));
         assert_eq!(crx_sub.recv().unwrap(), ("network.newblk".to_string(), vec![2]));
