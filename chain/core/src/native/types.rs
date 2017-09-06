@@ -246,6 +246,7 @@ mod tests {
         let mut ext = FakeExt::new();
 
         let original = String::from("abcdefghijabcdefghijabcdefghij");
+        println!("original={:?}", original);
         assert!(String::put(&mut ext, &H256::from(0), &original).is_ok());
         if let Ok(expected) = String::get(&mut ext, &H256::from(0)) {
             assert_eq!(original, *expected.as_ref());

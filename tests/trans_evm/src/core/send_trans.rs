@@ -55,6 +55,7 @@ pub struct Sendtx {
     code: String,
     first: Arc<Mutex<i32>>,
     totaltx: u64,
+    contractaddr: String,
 }
 
 #[allow(dead_code, unused_variables, unused_assignments, non_snake_case, unused_mut)]
@@ -72,6 +73,7 @@ impl Sendtx {
             code: param.code.clone(),
             first: Arc::new(Mutex::new(0)),
             totaltx: totaltx as u64,
+            contractaddr: param.contractaddr.clone(),
         };
         trans
     }
@@ -316,7 +318,9 @@ impl Sendtx {
     pub fn dispatch_send_thd(&self, sync_send: mpsc::Sender<(u64, u64)>, send_h: mpsc::Sender<u64>) {
 
         //获取合约地址
-        let sender = self.get_contract_address();
+        //let sender = self.get_contract_address();
+        let sender = &self.contractaddr;
+        println!("contract address={:?}", sender);
 
         for index in 0..self.threads {
             //发送交易
