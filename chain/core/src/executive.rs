@@ -206,6 +206,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             }
             Action::Call(ref address) => {
                 let mcode = Vec::<u8>::from(concat!("12345678901234567890"));
+                let mut scode = self.state.code(address)?;
+                if scode.is_none(){
+                    scode = Some(Arc::new(mcode));
+                }
 
                 let params = ActionParams {
                     code_address: address.clone(),
@@ -215,7 +219,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     gas: t.gas - base_gas_required,
                     gas_price: t.gas_price,
                     value: ActionValue::Transfer(t.value),
-                    code: Some(Arc::new(mcode)),
+                    code: scode.clone(),
                     //code: self.state.code(address)?,
                     code_hash: self.state.code_hash(address)?,
                     data: Some(t.data.clone()),

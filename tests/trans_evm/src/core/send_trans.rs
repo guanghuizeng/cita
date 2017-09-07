@@ -160,7 +160,7 @@ impl Sendtx {
         ret
     }
 
-
+    #[allow(dead_code, unused_variables)]
     pub fn send_tx(&self, action: Action, sync_send: mpsc::Sender<(u64, u64)>, send_h: mpsc::Sender<u64>, sender: String) {
 
         let mut sucess = 0;
@@ -179,7 +179,19 @@ impl Sendtx {
                 }
                 Action::Call => {
                     //读取合约地址
-                    Trans::generate_tx(&self.code, sender.clone(), &frompv)
+                    let mut code = self.code.clone();
+                    if code.len() > 8 && self.txnum > 1 {
+                        let start = '0';
+                        let mut step = (index % 10) as u8;
+                        println!("step={:?}", step);
+                        let mut value = start as u8;
+                        value = value + step;
+                        let end = value as char;
+                        code.pop();
+                        code.push(end);
+                    }
+                    println!("code={:?}", code);
+                    Trans::generate_tx(&code, sender.clone(), &frompv)
                 }
                 Action::Store => {
                     Trans::generate_tx(&self.code, sender.clone(), frompv)
@@ -218,7 +230,6 @@ impl Sendtx {
                 }
                 _ => println!("jsonrpc connect [{}] fail!", url),
             }
-
         }
 
         println!("sucess {}, fail {}", sucess, fail);

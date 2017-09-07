@@ -959,6 +959,7 @@ mod tests {
     use types::transaction::SignedTransaction;
     use util::{U256, H256, Address};
     use util::kvdb::{Database, DatabaseConfig};
+    use std::str::FromStr;
     //use util::hashable::HASH_NAME;
 
     #[test]
@@ -1068,6 +1069,89 @@ mod tests {
         bench(20000);
         b.iter(|| {});
     }
+
+    #[bench]
+    fn bench_solidity_call_contract(b: &mut Bencher) {
+        let chain = init_chain();
+        let keypair = KeyPair::gen_keypair();
+        let privkey = keypair.privkey();
+        let data = "60606040523415600b57fe5b5b5b5b608e8061001c6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680635524107714603a575bfe5b3415604157fe5b605560048080359060200190919050506057565b005b806000819055505b505600a165627a7a7230582079b763be08c24124c9fa25c78b9d221bdee3e981ca0b2e371628798c41e292ca0029"
+            .from_hex()
+            .unwrap();
+
+        let block = create_block(&chain, privkey, Address::from(0), data, (0, 1));
+        chain.set_block(block.clone());
+
+        let txhash = block.body().transactions()[0].hash();
+        let receipt = chain.localized_receipt(txhash).expect("no receipt found");
+        let to = receipt.contract_address.unwrap();
+        let data = format!("{}{}", "55241077", "0000000000000000000000000000000000000000000000000000000012345678")
+            .from_hex()
+            .unwrap();
+        println!("passsss");
+
+        let bench = |tpb: u32| {
+            let block = create_block(&chain, privkey, to, data.clone(), (1, tpb + 1));
+
+            //construct open_block
+            let current_state_root = chain.current_state_root();
+            let last_hashes = chain.last_hashes();
+            let mut open_block = OpenBlock::new(chain.factories.clone(), false, block, chain.state_db.boxed_clone(), current_state_root, last_hashes.into()).unwrap();
+
+            //open_block.apply_transactions();
+            let start = Instant::now();
+            for t in open_block.body.transactions.clone() {
+                black_box(open_block.apply_transaction(&t));
+            }
+            let elapsed = start.elapsed();
+            let tps = u64::from(tpb) * 1_000_000_000 / (elapsed.as_secs() * 1_000_000_000 + u64::from(elapsed.subsec_nanos()));
+            println!("tpb: {:>6}, tps: {:>6}", tpb, tps);
+
+        };
+        bench(3000);
+        bench(5000);
+        bench(10000);
+        bench(20000);
+        b.iter(|| {});
+    }
+
+    #[bench]
+    fn bench_native_call_contract(b: &mut Bencher) {
+        let chain = init_chain();
+        let keypair = KeyPair::gen_keypair();
+        let privkey = keypair.privkey();
+
+        let to = Address::from_str("0000000000000000000000000000000000000900").unwrap();
+        let data = format!("{}{}", "00000000", "0000000000000000000000000000000000000000000000000000000000000008")
+            .from_hex()
+            .unwrap();
+
+        println!("passsss");
+        let bench = |tpb: u32| {
+            let block = create_block(&chain, privkey, to, data.clone(), (1, tpb + 1));
+
+            //construct open_block
+            let current_state_root = chain.current_state_root();
+            let last_hashes = chain.last_hashes();
+            let mut open_block = OpenBlock::new(chain.factories.clone(), false, block, chain.state_db.boxed_clone(), current_state_root, last_hashes.into()).unwrap();
+
+            //open_block.apply_transactions();
+            let start = Instant::now();
+            for t in open_block.body.transactions.clone() {
+                black_box(open_block.apply_transaction(&t));
+            }
+            let elapsed = start.elapsed();
+            let tps = u64::from(tpb) * 1_000_000_000 / (elapsed.as_secs() * 1_000_000_000 + u64::from(elapsed.subsec_nanos()));
+            println!("tpb: {:>6}, tps: {:>6}", tpb, tps);
+
+        };
+        bench(3000);
+        bench(5000);
+        bench(10000);
+        bench(20000);
+        b.iter(|| {});
+    }
+
 
     #[test]
     fn test_code_at() {
