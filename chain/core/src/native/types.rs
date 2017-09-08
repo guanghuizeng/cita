@@ -136,7 +136,7 @@ pub trait KVVec<T> {
     fn get_len(ext: &mut Ext, pos: &H256) -> Result<u64, String>;
 }
 pub struct Array<T> {
-    _data: T,
+    pub _data: T,
 }
 
 impl<T> KVVec<T> for Array<T>
