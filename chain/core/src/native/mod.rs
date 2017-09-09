@@ -27,47 +27,39 @@ use util::{H256, U256};
 
 ////////////////////////////////////////////////////////////////////////////////
 pub type Signature = u32;
-pub type Function = Fn(&ActionParams, &mut Ext) -> evm::Result<GasLeft<'static>> + Sync + Send;
 pub mod storage;
 ////////////////////////////////////////////////////////////////////////////////
 // Contract
-pub trait Contract: Sync + Send {
-    fn get_function(&self, hash: &Signature) -> Option<&Box<Function>>;
-    fn exec(&self, params: &ActionParams, ext: &mut Ext) {
-        if let Some(data) = params.clone().data.unwrap().get(0..4) {
-            let signature = data.iter().fold(0u32, |acc, &x| (acc << 8) + (x as u32));
-            if let Some(exec_call) = self.get_function(&signature) {
-                //let cost = self.engine.cost_of_builtin(&params.code_address, data);
-                let cost = U256::from(100);
-                if cost <= params.gas {
-                    let _ = exec_call(params, ext);
-                    //self.state.discard_checkpoint();
-                    return;
-                }
-            }
-        }
-    }
+pub trait Contract<'a>: Sync + Send {
+    fn exec2(&self, signature: Signature, params: ActionParams, ext: &mut Ext) -> Result<GasLeft, evm::Error>;
+    fn exec(&'a self, params: &ActionParams, ext: &mut Ext) -> Result<GasLeft<'a>, evm::Error>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // NowPay
-pub struct NowPay {
-    functions: HashMap<Signature, Box<Function>>,
+pub struct NowPay<'a> {
+    funcs: HashMap<Signature, Box<Fn(&'a NowPay, ActionParams, &mut Ext) -> Result<GasLeft<'a>, evm::Error> + Sync + Send>>,
 }
 
-impl Contract for NowPay {
-    fn get_function(&self, hash: &Signature) -> Option<&Box<Function>> {
-        self.functions.get(hash)
+impl<'a> Contract for NowPay<'a> {
+    fn exec(&self, params: &ActionParams, ext: &mut Ext) {}
+    fn exec2(&'a self, signature: Signature, params: ActionParams, ext: &mut Ext) -> Result<GasLeft<'a>, evm::Error> {
+        if let Some(func) = self.funcs.get(&signature) {
+            func(self, params, ext)
+        } else {
+            Err(evm::Error::OutOfGas)
+        }
     }
 }
 
-impl NowPay {
+impl<'a> NowPay<'a> {
     pub fn new() -> Self {
-        let mut contract = NowPay { functions: HashMap::<Signature, Box<Function>>::new() };
-        contract.functions.insert(0, Box::new(NowPay::set_value));
+        let mut contract = NowPay { funcs: HashMap::<Signature, Box<Fn(&'a NowPay, ActionParams, &mut Ext) -> evm::Result<GasLeft<'a>> + Sync + Send>>::new() };
+        contract.funcs.insert(0, Box::new(NowPay::set_value));
         contract
     }
-    pub fn set_value(params: &ActionParams, ext: &mut Ext) -> evm::Result<GasLeft<'static>> {
+
+    pub fn set_value(&'a self, params: ActionParams, ext: &mut Ext) -> evm::Result<GasLeft<'a>> {
         if let Some(ref data) = params.data {
             if let Some(data) = data.get(4..32) {
                 let _ = ext.set_storage(H256::from(0), H256::from(data));
