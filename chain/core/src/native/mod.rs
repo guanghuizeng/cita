@@ -31,8 +31,8 @@ pub mod storage;
 ////////////////////////////////////////////////////////////////////////////////
 // Contract
 pub trait Contract<'a>: Sync + Send {
-    fn exec2(&self, signature: Signature, params: ActionParams, ext: &mut Ext) -> Result<GasLeft, evm::Error>;
-    fn exec(&'a self, params: &ActionParams, ext: &mut Ext) -> Result<GasLeft<'a>, evm::Error>;
+    fn exec2(&'a self, signature: Signature, params: ActionParams, ext: &mut Ext) -> Result<GasLeft<'a>, evm::Error>;
+    fn exec(&self, params: &ActionParams, ext: &mut Ext);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
