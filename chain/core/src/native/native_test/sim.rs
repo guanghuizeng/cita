@@ -6,9 +6,10 @@ use native::types::*;
 pub struct SimpleStorage {
     functions: HashMap<Signature, Box<Function>>,
     uint: U256,
-    bytes: Vec<u8>,
+    bytes: Bytes, //Vec<u8>,
     string: String,
     array_u256: Array<U256>,
+    map_u256: Map<U256, U256>,
 }
 
 #[allow(dead_code)]
@@ -25,9 +26,13 @@ impl SimpleStorage {
         let mut contract = SimpleStorage {
             functions: HashMap::<Signature, Box<Function>>::new(),
             uint: U256::from(0),
-            bytes: Vec::new(),
+            bytes: Bytes::new(),  //Vec::new(),
             string: String::new(),
             array_u256: Array::<U256>{ _data: U256::from(0), },
+            map_u256: Map::<U256, U256>{
+                _key: U256::from(0),
+                _value: U256::from(0),
+            },
         };
         contract.functions.insert(0, Box::new(SimpleStorage::set));
         contract.functions.insert(1, Box::new(SimpleStorage::get));
@@ -37,6 +42,8 @@ impl SimpleStorage {
         contract.functions.insert(5, Box::new(SimpleStorage::get_string));
         contract.functions.insert(6, Box::new(SimpleStorage::set_array));
         contract.functions.insert(7, Box::new(SimpleStorage::get_array));
+        contract.functions.insert(8, Box::new(SimpleStorage::set_map));
+        contract.functions.insert(9, Box::new(SimpleStorage::get_map));
         contract
     }
 
@@ -155,6 +162,32 @@ impl SimpleStorage {
         } else {
             trace!("exception for func of get_array");
         }
+        Ok(GasLeft::Known(U256::from(0)))
+    }
+
+    pub fn set_map(params: &ActionParams, ext: &mut Ext) -> evm::Result<GasLeft<'static>> {
+        if let Some(ref data) = params.data {
+            let key = data.get(4..36).unwrap();
+            let value = data.get(36..68).unwrap();
+            info!("key={:?}, value={:?}", U256::from(key), U256::from(value));
+            let _ = U256::put(ext, &H256::from(4), &U256::from(key));
+            let _ = Map::<U256, U256>::put_item(ext, &H256::from(4), U256::from(key), &U256::from(value));
+        }
+        Ok(GasLeft::Known(U256::from(0)))
+    }
+
+    pub fn get_map(params: &ActionParams, ext: &mut Ext) -> evm::Result<GasLeft<'static>> {
+        if let Ok(key) = U256::get(ext, &H256::from(4)){
+            info!("get_map of key={:?}", *key.as_ref());
+            if let Ok(value) = Map::<U256, U256>::get_item(ext, &H256::from(4), U256::from(*key.as_ref())) {
+                info!("get_map of value={:?}", *value.as_ref());
+            } else {
+                trace!("exception for get_value");
+            }
+        } else {
+            trace!("exception for get_key");
+        }
+
         Ok(GasLeft::Known(U256::from(0)))
     }
 }

@@ -178,8 +178,8 @@ where
 }
 
 pub struct Map<Key, Value> {
-    _key: Key,
-    _value: Value,
+    pub _key: Key,
+    pub _value: Value,
 }
 
 pub trait Serialize {
@@ -210,6 +210,7 @@ where
         bytes.extend_from_slice(Key::serialize(key).as_ref());
         bytes.extend_from_slice(pos.as_ref());
         let key = bytes.crypt_hash();
+        info!("map of put_item key={:?}", key);
         Value::put(ext, &key, value)
     }
     fn get_item(ext: &Ext, pos: &H256, key: Key) -> Result<Box<Value>, String> {
@@ -217,6 +218,7 @@ where
         bytes.extend_from_slice(Key::serialize(key).as_ref());
         bytes.extend_from_slice(pos.as_ref());
         let key = bytes.crypt_hash();
+        info!("map of get_item key={:?}", key);
         Value::get(ext, &key)
     }
 }
